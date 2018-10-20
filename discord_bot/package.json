@@ -4,9 +4,16 @@
   "description": "the discord bot part of the ttt_discord_bot",
   "main": "index.js",
   "dependencies": {
-    "discord.js": "^11.3.2"
+    "bunyan": "^1.8.12",
+    "discord.js": "^11.4.2",
+    "express": "^4.16.4"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "eslint": "^5.7.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-config-prettier": "^3.1.0",
+    "eslint-plugin-import": "^2.14.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
