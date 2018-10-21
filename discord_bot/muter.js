@@ -36,16 +36,16 @@ function register(user) {
 }
 
 async function setMuted({ user, muted }) {
-  if (!isMemberInVoiceChannel(user) || user.serverMute) {
+  if (!isMemberInVoiceChannel(user)) {
     return Promise.resolve();
   }
 
   const reason = muted ? "You can't talk if you are dead" : '';
 
+  logger.info(`Set muted state for user ${user} to ${muted}`);
+
   const result = await user.setMute(muted, reason);
   users[user] = muted;
-
-  logger.info(`Set muted state for user ${user} to ${muted}`);
 
   return result;
 }

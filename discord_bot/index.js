@@ -1,4 +1,7 @@
 const express = require('express');
+const expressBunyanLogger = require('express-bunyan-logger');
+const bodyParser = require('body-parser');
+
 const logger = require('./logger');
 
 const {
@@ -11,29 +14,43 @@ const {
 const port = 37405;
 const app = express();
 
+// app.use(expressBunyanLogger());
+app.use(
+  bodyParser.urlencoded({
+    // to support URL-encoded bodies
+    extended: true
+  })
+);
+
 app.get('/', (req, res) => res.send('Hello World!'));
 
-app.get('/connect', (req, res) => {
-  const utf8Tag = req.params.tag.split(' ');
-  let tag = '';
+app.post('/connect', (req, res) => {
+  const { tag } = req.body;
+
+  if (!tag) {
+    return res.sendStatus(400).send();
+  }
+
+  const utf8Tag = tag.split(' ');
+  let sanatisedTag = '';
 
   utf8Tag.forEach(e => {
-    tag += String.fromCharCode(e);
+    sanatisedTag += String.fromCharCode(e);
   });
 
-  const found = findUsersByTag(utf8Tag);
+  const found = findUsersByTag(sanatisedTag);
 
   logger.info(
-    `Connection request for user ${tag}, found ${found.length} users`
+    `Connection request for user ${sanatisedTag}, found ${found.length} users`
   );
 
   if (found.length > 1) {
-    res.status(400).json({
+    res.status(200).json({
       // TODO: Clean up these status codes. Too many users.
       answer: 1
     });
   } else if (found.length < 1) {
-    res.status(400).json({
+    res.status(200).json({
       answer: 0 // no found
     });
   } else {
@@ -45,25 +62,31 @@ app.get('/connect', (req, res) => {
   }
 });
 
-app.get('/mute', async (req, res) => {
-  const { id } = req.params;
-  const { mute } = req.params;
+app.post('/mute', async (req, res) => {
+  const { id, mute } = req.body;
 
-  if (typeof id !== 'string' || typeof mute !== 'boolean') {
-    return res.statusCode(400).send();
+  if (!id || mute === undefined) {
+    return res.sendStatus(400).send();
   }
+
+  const muted = mute === 'true';
 
   const member = findUserById(id);
 
   if (member) {
-    await setMuted({ user: member, muted: true });
+    try {
+      await setMuted({ user: member, muted });
+    } catch (err) {
+      logger.error(err);
+      res.sendStatus(500).send();
+    }
     res
       .json({
         success: true
       })
       .send();
   } else {
-    res.statusCode(404).send();
+    res.sendStatus(404).send();
   }
 });
 
