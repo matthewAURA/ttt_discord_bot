@@ -21,9 +21,8 @@ if (CLIENT) then
 end
 util.AddNetworkString("drawMute")
 
-REMOTE_HOST = "http://bd11bc1c.ngrok.io"
--- PORT = 37405
-PORT = 0
+REMOTE_HOST = "http://discord_bot"
+PORT = 37405
 PREFIX = "[TTT Discord Bot] "
 FILEPATH = "ttt_discord_bot.dat"
 TRIES = 3
