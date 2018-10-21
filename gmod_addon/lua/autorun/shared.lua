@@ -21,7 +21,9 @@ if (CLIENT) then
 end
 util.AddNetworkString("drawMute")
 
-PORT = 37405
+REMOTE_HOST = "http://bd11bc1c.ngrok.io"
+-- PORT = 37405
+PORT = 0
 PREFIX = "[TTT Discord Bot] "
 FILEPATH = "ttt_discord_bot.dat"
 TRIES = 3
@@ -38,17 +40,31 @@ function saveIDs()
 	file.Write( FILEPATH, util.TableToJSON(ids))
 end
 
+function buildUrl(path)
+    if PORT > 0 then
+        return REMOTE_HOST .. ":" .. PORT .. path
+    else
+        return REMOTE_HOST .. path
+    end
+end
 
-function GET(req,params,cb,tries)
-	http.Fetch("http://localhost:"..PORT,function(res)
-		--print(res)
-		cb(util.JSONToTable(res))
-	end,function(err)
-		print(PREFIX.."Request to bot failed. Is the bot running?")
-		print("Err: "..err)
-		if (!tries) then tries = TRIES end
-		if (tries != 0) then GET(req,params,cb, tries-1) end
-	end,{req=req,params=util.TableToJSON(params)})
+function postWithRetries(path, params, callback)
+    url = buildUrl(path)
+    print("Connecting to " .. url .. " with data " .. util.TableToJSON(params))
+    http.Post(
+        url,
+        params,
+        function(res, length, headers, statusCode)
+            if statusCode == 200 then
+                callback(util.JSONToTable(res))
+            else
+                print("Request to bot failed with status code " .. statusCode .. ": " .. res)
+            end
+        end,
+        function(err)
+            print(err)
+        end
+    )
 end
 
 function sendClientIconInfo(ply,mute)
@@ -73,19 +89,20 @@ end
 function mute(ply)
 	if (ids[ply:SteamID()]) then
 		if (!isMuted(ply)) then
-			GET("mute",{mute=true,id=ids[ply:SteamID()]},function(res)
-				if (res) then
-					--PrintTable(res)
-					if (res.success) then
-						ply:PrintMessage(HUD_PRINTCENTER,"You're muted in discord!")
-						sendClientIconInfo(ply,true)
-						muted[ply] = true
-					end
-					if (res.error) then
-						print(PREFIX.."Error: "..res.err)
-					end
-				end
-
+            postWithRetries("/mute", 
+                { mute=tostring(true), id=ids[ply:SteamID()] },
+                function(res)
+                    if (res) then
+                        --PrintTable(res)
+                        if (res.success) then
+                            ply:PrintMessage(HUD_PRINTCENTER,"You're muted in discord!")
+                            sendClientIconInfo(ply,true)
+                            muted[ply] = true
+                        end
+                        if (res.error) then
+                            print(PREFIX.."Error: "..res.err)
+                        end
+                end
 			end)
 		end
 	end
@@ -95,16 +112,19 @@ function unmute(ply)
 	if (ply) then
 		if (ids[ply:SteamID()]) then
 			if (isMuted(ply)) then
-				GET("mute",{mute=false,id=ids[ply:SteamID()]},function(res)
-					if (res.success) then
-						ply:PrintMessage(HUD_PRINTCENTER,"You're no longer muted in discord!")
-						sendClientIconInfo(ply,false)
-						muted[ply] = false
-					end
-					if (res.error) then
-						print(PREFIX.."Error: "..res.err)
-					end
-				end)
+                postWithRetries("/mute",
+                    {mute=tostring(false),id=ids[ply:SteamID()]},
+                    function(res)
+                        if (res.success) then
+                            ply:PrintMessage(HUD_PRINTCENTER,"You're no longer muted in discord!")
+                            sendClientIconInfo(ply,false)
+                            muted[ply] = false
+                        end
+                        if (res.error) then
+                            print(PREFIX.."Error: "..res.err)
+                        end
+                    end
+                )
 			end
 		end
 	else
@@ -115,14 +135,15 @@ function unmute(ply)
 end
 
 hook.Add("PlayerSay", "ttt_discord_bot_PlayerSay", function(ply,msg)
-  if (string.sub(msg,1,9) != '!discord ') then return end
-  tag = string.sub(msg,10)
-  tag_utf8 = ""
-  
-  for p, c in utf8.codes(tag) do
-	tag_utf8 = string.Trim(tag_utf8.." "..c)
-  end
-	GET("connect",{tag=tag_utf8},function(res)
+    if (string.sub(msg,1,9) != '!discord ') then return end
+    tag = string.sub(msg,10)
+    tag_utf8 = ""
+
+    for p, c in utf8.codes(tag) do
+        tag_utf8 = string.Trim(tag_utf8.." "..c)
+    end
+
+	postWithRetries("/connect", {tag=tag_utf8}, function(res)
 		if (res.answer == 0) then ply:PrintMessage(HUD_PRINTTALK,"No guilde member with a discord tag like '"..tag.."' found.") end
 		if (res.answer == 1) then ply:PrintMessage(HUD_PRINTTALK,"Found more than one user with a discord tag like '"..tag.."'. Please specify!") end
 		if (res.tag && res.id) then
